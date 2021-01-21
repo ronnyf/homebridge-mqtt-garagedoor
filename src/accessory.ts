@@ -1,5 +1,3 @@
-import { throws } from 'assert';
-import { unwatchFile } from 'fs';
 import {
   AccessoryConfig,
   AccessoryPlugin,
@@ -80,7 +78,7 @@ class GarageDoorSwitch implements AccessoryPlugin {
         .setCharacteristic(hap.Characteristic.Manufacturer, 'RFxLabs')
         .setCharacteristic(hap.Characteristic.Model, 'GDO1HK');
       
-      log.info('GarageDoor accessory finished initializing!');
+      log.info('GarageDoor accessory finished initializing! ', api.version);
     }
 
     configureService(service: Service) {
