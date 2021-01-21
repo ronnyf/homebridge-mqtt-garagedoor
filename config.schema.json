@@ -1,7 +1,7 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
-  "pluginType": "platform",
-  "singular": true,
+  "pluginAlias": "GarageDoor",
+  "pluginType": "accessory",
+  "singular": false,
   "schema": {
     "type": "object",
     "properties": {
@@ -9,7 +9,37 @@
         "title": "Name",
         "type": "string",
         "required": true,
-        "default": "Example Dynamic Platform"
+        "default": "Accessory name displayed in HomeKit"
+      },
+      "mqttHost": {
+        "type": "string",
+        "title": "URL",
+        "description": "MQTT broker URL default: mqtt://localhost:1883",
+        "placeholder": "mqtt://localhost:1883"
+      },
+      "mqttUsername": {
+        "type": "string",
+        "required": false,
+        "title": "Username",
+        "description": "MQTT Username (optional)"
+      },
+      "mqttPassword": {
+        "type": "string",
+        "required": false,
+        "title": "Password",
+        "description": "MQTT Password (optional)"
+      },
+      "setTopic": {
+        "type": "string",
+        "title": "SET topic",
+        "placeholder": "garage/door/set",
+        "description": "MQTT Topic to trigger the garage door motor"
+      },
+      "stateTopic": {
+        "type": "string",
+        "title": "STATE topic",
+        "placeholder": "garage/door/get/state",
+        "description": "MQTT Topic for door state subscription"
       }
     }
   }
