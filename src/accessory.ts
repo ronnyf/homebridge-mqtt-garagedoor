@@ -11,6 +11,7 @@ import {
 } from 'homebridge';
 
 import mqtt, { MqttClient, IClientOptions } from 'mqtt';
+import { ACCESSORY_NAME } from './settings';
 
 let hap: HAP;
 
@@ -19,7 +20,7 @@ let hap: HAP;
  */
 export = (api: API) => {
   hap = api.hap;
-  api.registerAccessory('GarageDoorSwitch', GarageDoorSwitch);
+  api.registerAccessory(ACCESSORY_NAME, GarageDoorSwitch);
 };
 
 class GarageDoorSwitch implements AccessoryPlugin {
@@ -41,8 +42,8 @@ class GarageDoorSwitch implements AccessoryPlugin {
     private mqttClient: MqttClient;
 
     private setTopic: string;
+    private stateTopic: string;
     private readonly setValue: string = '1';
-    private readonly stateTopic: string = 'd/garage/door/get/state';
 
     // private readonly switchService: Service;
     private readonly garageDoorService: Service;
@@ -62,7 +63,10 @@ class GarageDoorSwitch implements AccessoryPlugin {
       const mqttUsername = config['mqttUsername'];
       const mqttPassword = config['mqttPassword'];
 
-      const opts: IClientOptions = { clientId: 'hk-plugin', rejectUnauthorized: false };
+      const mqttClientID = config['mqttClientID'] as string ?? 'HomeBridge' + api.serverVersion;
+      log.info('using client id: ', mqttClientID);
+
+      const opts: IClientOptions = { clientId: mqttClientID, rejectUnauthorized: false };
       if (mqttUsername && mqttPassword) {
         opts.username = mqttUsername as string;
         opts.password = mqttPassword as string;
@@ -78,7 +82,7 @@ class GarageDoorSwitch implements AccessoryPlugin {
         .setCharacteristic(hap.Characteristic.Manufacturer, 'RFxLabs')
         .setCharacteristic(hap.Characteristic.Model, 'GDO1HK');
       
-      log.info('GarageDoor accessory finished initializing! ', api.version);
+      log.info('GarageDoor accessory finished initializing!');
     }
 
     configureService(service: Service) {

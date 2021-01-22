@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "GarageDoor",
+  "pluginAlias": "GarageDoorSwitch",
   "pluginType": "accessory",
   "singular": false,
   "schema": {
@@ -9,7 +9,7 @@
         "title": "Name",
         "type": "string",
         "required": true,
-        "default": "Accessory name displayed in HomeKit"
+        "default": "GarageDoor"
       },
       "mqttHost": {
         "type": "string",
@@ -28,6 +28,12 @@
         "required": false,
         "title": "Password",
         "description": "MQTT Password (optional)"
+      },
+      "mqttClientID": {
+        "type": "string",
+        "title": "ClientID",
+        "required": false,
+        "description": "MQTT Client ID (optional, default: HomeBridge)"
       },
       "setTopic": {
         "type": "string",
