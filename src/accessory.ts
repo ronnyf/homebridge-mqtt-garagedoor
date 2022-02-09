@@ -201,12 +201,6 @@ class GarageDoorSwitch implements AccessoryPlugin {
       if (this.currentDoorState() !== this.targetDoorState()) {
         this.updateTargetDoorState(this.currentDoorState());
       }
-
-      // //compare target state with current and decide if we need to change it ...
-      // if (this.currentDoorState !== this.targetDoorState) {
-      //   this.log.debug('publishing set:1');
-      //   this.mqttClient.publish(this.setTopic, '1');
-      // }
     }
 
     /*
