@@ -24,14 +24,15 @@ class GarageDoorSwitch implements AccessoryPlugin {
   private readonly log: Logging;
   private readonly name: string;
 
-  private readonly doorStateMap = {};
-  private readonly targetDoorStates: string[];
+  private readonly currentDoorStateMap = {};
+  private readonly currentDoorStates: string[] = [];
+  private readonly targetDoorStates: string[] = [];
 
   private mqttClient: MqttClient;
 
   private setTopic: string;
   private stateTopic: string;
-  private readonly setValue: string = '1';
+  private didInitialize: boolean;
 
   // private readonly switchService: Service;
   private readonly garageDoorService: Service;
@@ -50,16 +51,23 @@ class GarageDoorSwitch implements AccessoryPlugin {
           static readonly STOPPED = 4;
       */
 
-    this.doorStateMap = {
+
+    this.currentDoorStates = [
+      'open',
+      'closed',
+      'opening',
+      'closing',
+      'stopped',
+    ];
+
+    this.currentDoorStateMap = {
       'open': api.hap.Characteristic.CurrentDoorState.OPEN,
       'closed': api.hap.Characteristic.CurrentDoorState.CLOSED,
       'opening': api.hap.Characteristic.CurrentDoorState.OPENING,
       'closing': api.hap.Characteristic.CurrentDoorState.CLOSING,
+      'stopped': api.hap.Characteristic.CurrentDoorState.STOPPED,
       'error': api.hap.Characteristic.CurrentDoorState.STOPPED,
-      'problem': api.hap.Characteristic.CurrentDoorState.STOPPED,
     };
-
-    this.targetDoorStates = ['open', 'close'];
 
     this.setTopic = config['setTopic'] as string ?? 'garage/door/set';
     this.stateTopic = config['stateTopic'] as string ?? 'garage/door/state';
@@ -67,17 +75,18 @@ class GarageDoorSwitch implements AccessoryPlugin {
     const mqttHost = config['mqttHost'] ?? 'mqtt://localhost:1883';
     const mqttUsername = config['mqttUsername'];
     const mqttPassword = config['mqttPassword'];
-
     // TODO: add to config
-    // const mqttOpenMessage = config['mqttOpenMessage'] ?? 'open';
-    // const mqttCloseMessage = config['mqttCloseMessage'] ?? 'close';
+    const mqttOpenMessage = config['mqttOpenMessage'] ?? 'open';
+    const mqttCloseMessage = config['mqttCloseMessage'] ?? 'close';
+
+    this.targetDoorStates = [mqttOpenMessage, mqttCloseMessage];
 
     const mqttClientID = config['mqttClientID'] as string ?? 'HomeBridge' + api.serverVersion;
-    log.info('using client id: ', mqttClientID);
+    log.debug('using client id: ', mqttClientID);
 
-    const opts: IClientOptions = { 
-      clientId: mqttClientID, 
-      rejectUnauthorized: false, 
+    const opts: IClientOptions = {
+      clientId: mqttClientID,
+      rejectUnauthorized: false,
       clean: true,
     };
 
@@ -89,13 +98,15 @@ class GarageDoorSwitch implements AccessoryPlugin {
     this.mqttClient = mqtt.connect(mqttHost, opts);
     this.configureMQTT();
 
+    this.didInitialize = false;
+
     this.garageDoorService = new api.hap.Service.GarageDoorOpener(this.name);
     this.configureService(this.garageDoorService);
 
     this.informationService = new api.hap.Service.AccessoryInformation()
       .setCharacteristic(this.api.hap.Characteristic.Manufacturer, 'RFxLabs')
       .setCharacteristic(this.api.hap.Characteristic.Model, 'GDO1HK');
-      
+
     log.info('GarageDoor accessory finished initializing!');
   }
 
@@ -109,28 +120,75 @@ class GarageDoorSwitch implements AccessoryPlugin {
   }
 
   changeTargetDoorState(change: CharacteristicChange) {
-    if (change.newValue !== this.currentDoorState()) {
-      const signal = this.targetDoorStates[change.newValue as number];
-      this.log.debug('updating garage door (target) state: ', signal);
-      this.mqttClient.publish(this.setTopic, signal);
-    } else {
-      this.log.debug('no change required as current door state == target door state');
-    }
+    this.printDoorStates();
+
+    const num = change.newValue as number;
+    const targetIndex = Math.abs(num);
+    this.sendTargetDoorState(targetIndex);
+  }
+
+  sendTargetDoorState(index: number) {
+    const signal = this.targetDoorStates[index];
+    this.log.debug('updating garage door (target) state: ', index, ', desc: ', signal, 'topic: ', this.setTopic);
+    this.mqttClient.publish(this.setTopic, signal);
   }
 
   targetDoorState(): CharacteristicValue | null {
     return this.garageDoorService.getCharacteristic(this.api.hap.Characteristic.TargetDoorState).value;
   }
 
+  targetDoorStateDescription(): string | null {
+    const current = this.targetDoorState();
+    if (current !== null) {
+      const index = current as number;
+      if (index < this.targetDoorStates.length) {
+        const value = this.targetDoorStates[current as number];
+        return value;
+      }
+    }
+    return null;
+  }
+
   currentDoorState(): CharacteristicValue | null {
     return this.garageDoorService.getCharacteristic(this.api.hap.Characteristic.CurrentDoorState).value;
   }
 
-  updateCurrentDoorState(value: CharacteristicValue) {
-    this.garageDoorService.updateCharacteristic(this.api.hap.Characteristic.CurrentDoorState, value);
+  currentDoorStateDescription(): string | null {
+    const current = this.currentDoorState();
+    if (current === null) {
+      return 'NULL';
+    }
+
+    if (current === undefined) {
+      return 'UNDEFINED';
+    }
+
+    const index = current as number;
+    if (index < this.currentDoorStates.length) {
+      const value = this.currentDoorStates[index];
+      return value;
+    }
+    return null;
   }
 
-  configureMQTT() {     
+  printDoorStates() {
+    this.log.info('current door state ', this.currentDoorState(), ': ', this.currentDoorStateDescription());
+    this.log.info('target  door state ', this.targetDoorState(), ': ', this.targetDoorStateDescription());
+  }
+
+  updateCurrentDoorState(value: CharacteristicValue) {
+    if (this.didInitialize === false) {
+      this.log.info('initializing door states to ', value);
+      this.garageDoorService.setCharacteristic(this.api.hap.Characteristic.CurrentDoorState, value);
+      this.garageDoorService.setCharacteristic(this.api.hap.Characteristic.TargetDoorState, value);
+      this.didInitialize = true;
+    } else {
+      this.garageDoorService.updateCharacteristic(this.api.hap.Characteristic.CurrentDoorState, value);
+      this.log('updating current door state: ', this.currentDoorState(), ': ', this.currentDoorStateDescription());
+    }
+  }
+
+  configureMQTT() {
     this.log.debug('configuring mqtt connect callback');
     this.mqttClient.on('connect', (/*packet: IConnectPacket*/) => {
 
@@ -155,26 +213,24 @@ class GarageDoorSwitch implements AccessoryPlugin {
       this.mqttClient.subscribe(this.stateTopic, opts, (error) => {
         if (!error) {
           this.log.info('subscribed to ', this.stateTopic);
-          this.log.info('current door state ', this.currentDoorState());
-          this.log.info('target  door state ', this.targetDoorState());
+          this.printDoorStates();
         }
       }); //subsribe
 
     }); //onConnect
-      
+
     this.log.debug('configuring mqtt close callback');
     this.mqttClient.on('close', () => {
       this.log.info('disconnected from broker');
     });
 
-    this.log.debug('configuring mqtt message callback');       
+    this.log.debug('configuring mqtt message callback');
     this.mqttClient.on('message', (topic: string, payload: Buffer) => {
       this.log.debug('got message on topic ', topic, ', payload: ', payload.toString());
-      
+
       if (topic === this.stateTopic) {
         const value = payload.toString('ascii');
-        const state = this.doorStateMap[value] as CharacteristicValue;
-
+        const state = this.currentDoorStateMap[value] as CharacteristicValue;
         this.log.debug('got state: ', state, ' for value "', value, '" from mqtt');
         this.updateCurrentDoorState(state);
       } else {
@@ -190,7 +246,7 @@ class GarageDoorSwitch implements AccessoryPlugin {
   identify(): void {
     this.log('Identify!');
   }
-    
+
   /*
     * This method is called directly after creation of this instance.
     * It should return all services which should be added to the accessory.
