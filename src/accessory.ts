@@ -32,6 +32,7 @@ class GarageDoorSwitch implements AccessoryPlugin {
 
   private setTopic: string;
   private stateTopic: string;
+  private logTopic: string;
   private didInitialize: boolean;
 
   // private readonly switchService: Service;
@@ -71,6 +72,7 @@ class GarageDoorSwitch implements AccessoryPlugin {
 
     this.setTopic = config['setTopic'] as string ?? 'garage/door/set';
     this.stateTopic = config['stateTopic'] as string ?? 'garage/door/state';
+    this.logTopic = 'garage/door/log';
 
     const mqttHost = config['mqttHost'] ?? 'mqtt://localhost:1883';
     const mqttUsername = config['mqttUsername'];
@@ -107,7 +109,7 @@ class GarageDoorSwitch implements AccessoryPlugin {
       .setCharacteristic(this.api.hap.Characteristic.Manufacturer, 'RFxLabs')
       .setCharacteristic(this.api.hap.Characteristic.Model, 'GDO1HK');
 
-    log.info('GarageDoor accessory finished initializing!');
+    log.info('Accessory ', this.name, ', version: ', ', finished initializing!');
   }
 
   configureService(service: Service) {
@@ -212,10 +214,15 @@ class GarageDoorSwitch implements AccessoryPlugin {
       this.log.debug('subscribing to: ', this.stateTopic);
       this.mqttClient.subscribe(this.stateTopic, opts, (error) => {
         if (!error) {
-          this.log.info('subscribed to ', this.stateTopic);
-          this.printDoorStates();
+          this.log.debug('subscribed to ', this.stateTopic);
         }
       }); //subsribe
+
+      this.mqttClient.subscribe(this.logTopic, opts, (error) => {
+        if (!error) { 
+          this.log.debug('subscribed to ', this.logTopic);
+        }
+      });
 
     }); //onConnect
 
@@ -233,8 +240,11 @@ class GarageDoorSwitch implements AccessoryPlugin {
         const state = this.currentDoorStateMap[value] as CharacteristicValue;
         this.log.debug('got state: ', state, ' for value "', value, '" from mqtt');
         this.updateCurrentDoorState(state);
+      } else if (topic === this.logTopic) {
+        const value = payload.toString('ascii');
+        this.log.info('HW: ', value);
       } else {
-        this.log.warn('ignoring topic: ', topic);
+        this.log.info('ignoring topic: ', topic);
       }
     });
   }
