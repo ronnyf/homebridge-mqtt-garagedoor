@@ -11,6 +11,7 @@ import {
 
 import mqtt, { MqttClient, IClientOptions, IClientSubscribeOptions } from 'mqtt';
 import { ACCESSORY_NAME } from './settings';
+import { PLUGIN_VERSION } from './version';
 
 /*
  * Initializer function called when the plugin is loaded.
@@ -109,7 +110,7 @@ class GarageDoorSwitch implements AccessoryPlugin {
       .setCharacteristic(this.api.hap.Characteristic.Manufacturer, 'RFxLabs')
       .setCharacteristic(this.api.hap.Characteristic.Model, 'GDO1HK');
 
-    log.info('Accessory ', this.name, ', version: ', ', finished initializing!');
+    log.info('Accessory ', this.name, ', version: ', PLUGIN_VERSION, ', finished initializing!');
   }
 
   configureService(service: Service) {
@@ -124,8 +125,7 @@ class GarageDoorSwitch implements AccessoryPlugin {
   changeTargetDoorState(change: CharacteristicChange) {
     this.printDoorStates();
 
-    const num = change.newValue as number;
-    const targetIndex = Math.abs(num);
+    const targetIndex = change.newValue as number;
     this.sendTargetDoorState(targetIndex);
   }
 
