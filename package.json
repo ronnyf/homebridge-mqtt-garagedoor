@@ -2,7 +2,7 @@
   "private": false,
   "displayName": "MQTT garage door opener",
   "name": "homebridge-garagedoor-mqtt",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "A Homebridge plugin for MQTT and a custom (RFxLabs) esp8266 firmware",
   "license": "Apache-2.0",
   "repository": {
@@ -20,6 +20,7 @@
   "scripts": {
     "lint": "eslint src/**.ts --max-warnings=0",
     "watch": "npm run build && npm link && nodemon",
+    "prebuild": "node -p \"'export const PLUGIN_VERSION = ' + JSON.stringify(require('./package.json').version).replaceAll('\"', 'x') + ';'\" > src/version.ts",
     "build": "rimraf ./dist && tsc",
     "prepublishOnly": "npm run lint && npm run build"
   },
