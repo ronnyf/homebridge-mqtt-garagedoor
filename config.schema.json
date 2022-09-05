@@ -47,13 +47,13 @@
         "placeholder": "garage/door/state",
         "description": "MQTT Topic for door state subscription"
       },
-      "messageOpen": {
+      "mqttOpenMessage": {
         "type": "string",
         "title": "OPEN message",
         "placeholder": "open",
         "description": "MQTT message payload for the `open` command"
       },
-      "messageClose": {
+      "mqttCloseMessage": {
         "type": "string",
         "title": "CLOSE message",
         "placeholder": "close",
