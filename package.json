@@ -2,7 +2,7 @@
   "private": false,
   "displayName": "MQTT garage door opener",
   "name": "homebridge-garagedoor-mqtt",
-  "version": "0.1.12",
+  "version": "1.0.0",
   "description": "A Homebridge plugin for MQTT and a custom (RFxLabs) esp8266 firmware",
   "license": "Apache-2.0",
   "repository": {
@@ -13,14 +13,14 @@
     "url": "https://github.com/ronnyf/homebridge-mqtt-garagedoor/issues"
   },
   "engines": {
-    "node": ">=16.10.9",
-    "homebridge": ">=1.4.0"
+    "node": ">=20.9.0",
+    "homebridge": ">=1.8.0"
   },
   "main": "dist/accessory.js",
   "scripts": {
     "lint": "eslint src/**.ts --max-warnings=0",
     "watch": "npm run build && npm link && nodemon",
-    "prebuild": "node -p \"'export const PLUGIN_VERSION = ' + JSON.stringify(require('./package.json').version).replaceAll('\"', 'x') + ';'\" > src/version.ts",
+    "prebuild": "node -p \"'export const PLUGIN_VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
     "build": "rimraf ./dist && tsc",
     "prepublishOnly": "npm run lint && npm run build"
   },
@@ -31,14 +31,14 @@
     "door"
   ],
   "dependencies": {
-    "mqtt": "^4.3.7"
+    "mqtt": "^5.8.1"
   },
   "devDependencies": {
-    "@types/node": "^16.10.9",
+    "@types/node": "^20.9.0",
     "@typescript-eslint/eslint-plugin": "^5.0.0",
     "@typescript-eslint/parser": "^5.0.0",
     "eslint": "^8.0.1",
-    "homebridge": "^1.3.5",
+    "homebridge": "^1.8.0",
     "nodemon": "^2.0.13",
     "rimraf": "^3.0.2",
     "ts-node": "^10.3.0",
