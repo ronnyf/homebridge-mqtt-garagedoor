@@ -1,8 +1,8 @@
-import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service, Characteristic, UnknownContext } from 'homebridge';
+import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { GarageAccessory, GarageDoorOpenerAccessory } from './platformAccessory.js';
-import { GarageMQTT } from './garageMQTT.js';
+import { GarageMQTT } from './garagemqtt.js';
 
 /**
  * HomebridgePlatform
