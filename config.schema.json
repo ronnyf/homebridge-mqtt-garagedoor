@@ -1,7 +1,7 @@
 {
-  "pluginAlias": "GarageDoorSwitch",
-  "pluginType": "accessory",
-  "singular": false,
+  "pluginAlias": "GarageDoorOpenerHomebridgePlugin",
+  "pluginType": "platform",
+  "singular": true,
   "schema": {
     "type": "object",
     "properties": {
