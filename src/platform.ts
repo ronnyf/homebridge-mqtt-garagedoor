@@ -63,7 +63,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
      * It should be used to set up event handlers for characteristics and update respective values.
      */
   configureAccessory(accessory: PlatformAccessory) {
-    this.log.info('Loading accessory from cache:', accessory.displayName);
+    this.log.debug('Loading accessory from cache:', accessory.displayName);
 
     // add the restored accessory to the accessories cache, so we can track if it has already been registered
     this.accessories.push(accessory);
@@ -75,10 +75,11 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     const clientID = config['mqttClientID'] ?? 'GarageMQTT';
     const mqttHost = config['mqttHost'] ?? 'mqtt://localhost:1883';
 
+    log.debug('starting mqtt client');
     const client = await GarageMQTT.init(clientID, mqttUsername, mqttPassword, mqttHost);
 
     const subscription = await client.addSubscription([this.getSetTopic(), this.getStateTopic()]);
-    log.info('mqtt subscription: ', subscription);
+    log.debug('mqtt subscription: ', subscription);
 
     client.handleMessage(this.receiveMessage.bind(this));
   }
@@ -87,7 +88,8 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.log.info('received topic: ', topic);
     this.log.info('received payload: ', payload);
 
-    if (this.garageAccessory === null) { 
+    if (this.garageAccessory === null) {
+      this.log.debug('Accessory not configured (yet)');
       this.unhandledBuffers.push(payload);
       return;
     }
@@ -111,7 +113,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
   }
 
   async discoverDevices(config: PlatformConfig, log: Logging) {
-
+    this.log.debug('discovering devices:');
     await this.configureDevice(config, log);
 
     const deviceID = 'GD01';
@@ -128,7 +130,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
 
     if (existingAccessory) {
       // the accessory already exists
-      this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
+      this.log.debug('Restoring existing accessory from cache:', existingAccessory.displayName);
 
       // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. e.g.:
       // existingAccessory.context.device = device;
@@ -144,7 +146,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
       // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
     } else {
       // the accessory does not yet exist, so we need to create it
-      this.log.info('Adding new accessory:', deviceDisplayName);
+      this.log.debug('Adding new accessory:', deviceDisplayName);
 
       // create a new accessory
       const accessory = new this.api.platformAccessory(deviceDisplayName, uuid);
