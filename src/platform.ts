@@ -42,7 +42,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
-      this.discoverDevices(config, log);
+      (async () => await this.discoverDevices(config, log))();
     });
   }
 
