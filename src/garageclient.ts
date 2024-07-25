@@ -23,13 +23,24 @@ export class GarageMQTT {
     return new GarageMQTT(client);
   }
 
+  getConnected(): boolean { 
+    return this.client.connected;
+  }
+
   getClient(): MqttClient {
     return this.client;
   }
 
   async addSubscription(topic: string | string[]): Promise<ISubscriptionGrant[]> { 
-    const opts: IClientSubscribeOptions = { qos: 1 };
+    const opts: IClientSubscribeOptions = { qos: 1 }; 
+    // qos: 1 means we want the message to arrive at least once but don't care if it arrives twice (or more
     return this.client.subscribeAsync(topic, opts);
+  }
+
+  async readMessage(topic: string): Buffer {
+    this.client.on('message', (topic, payload) => {
+      
+    });
   }
 
   async handleMessage(callback: OnMessageCallback) {

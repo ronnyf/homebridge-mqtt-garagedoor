@@ -79,7 +79,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     const client = await GarageMQTT.init(clientID, mqttUsername, mqttPassword, mqttHost);
 
     const subscription = await client.addSubscription([this.getSetTopic(), this.getStateTopic()]);
-    this.log.debug('mqtt subscription: ', subscription);
+    this.log.debug('mqtt subscriptions: ', subscription);
 
     client.handleMessage(this.receiveMessage.bind(this));
   }
@@ -96,6 +96,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
 
     switch (topic) {
       case this.getStateTopic():
+        this.log.debug('accessory is handling state update');
         this.garageAccessory?.handleStateUpdate(payload);
         break;
 
@@ -103,6 +104,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
         break;
 
       case this.geLogTopic():
+        this.log.debug('accessory is handling log update');
         this.garageAccessory?.handleLogUpdate(payload);
         break;
 
