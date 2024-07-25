@@ -2,7 +2,7 @@ import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig,
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { GarageAccessory, GarageDoorOpenerAccessory } from './platformAccessory.js';
-import { GarageMQTT } from './garagemqtt.js';
+import { GarageMQTT } from './garageclient.js';
 
 /**
  * HomebridgePlatform
@@ -42,7 +42,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
-      (async () => await this.discoverDevices(config, log))();
+      (async () => await this.discoverDevices(config))();
     });
   }
 
@@ -69,17 +69,17 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.accessories.push(accessory);
   }
 
-  async configureDevice(config: PlatformConfig, log: Logging) {
+  async configureDevice(config: PlatformConfig) {
     const mqttUsername = config['mqttUsername'];
     const mqttPassword = config['mqttPassword'];
     const clientID = config['mqttClientID'] ?? 'GarageMQTT';
     const mqttHost = config['mqttHost'] ?? 'mqtt://localhost:1883';
 
-    log.debug('starting mqtt client');
+    this.log.debug('starting mqtt client');
     const client = await GarageMQTT.init(clientID, mqttUsername, mqttPassword, mqttHost);
 
     const subscription = await client.addSubscription([this.getSetTopic(), this.getStateTopic()]);
-    log.debug('mqtt subscription: ', subscription);
+    this.log.debug('mqtt subscription: ', subscription);
 
     client.handleMessage(this.receiveMessage.bind(this));
   }
@@ -112,9 +112,9 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  async discoverDevices(config: PlatformConfig, log: Logging) {
+  async discoverDevices(config: PlatformConfig) {
     this.log.debug('discovering devices:');
-    await this.configureDevice(config, log);
+    await this.configureDevice(config);
 
     const deviceID = 'GD01';
     const deviceDisplayName = 'Garage Door Opener';

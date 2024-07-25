@@ -46,11 +46,11 @@ export class GarageDoorOpenerAccessory implements GarageAccessory {
   }
 
   async handleStateUpdate(payload: Buffer) {
-    this.platform.log.info('state update');
+    this.platform.log.info('state update: ', payload);
   }
 
   async handleLogUpdate(payload: Buffer) {
-    this.platform.log.info('log update');
+    this.platform.log.info('log update: ', payload);
   }
 
   async setTargetDoorState(value: CharacteristicValue) {
