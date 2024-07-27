@@ -1,121 +1,111 @@
-import { Service, PlatformAccessory, CharacteristicValue, PlatformConfig, Characteristic } from 'homebridge';
+import { Service, PlatformAccessory, CharacteristicValue, Characteristic } from 'homebridge';
 import { GarageDoorOpenerPlatform } from './platform.js';
+import { GarageState } from './garagestate.js';
 
-export interface GarageAccessory {
-    // handleStateUpdate(payload: Buffer): Promise<void>;
-    handleStateUpdate(payload: Buffer): void;
-    handleLogUpdate(payload: Buffer): Promise<void>;
-}
-
-export class GarageDoorOpenerAccessory implements GarageAccessory {
+export class GarageDoorOpenerAccessory {
   private service: Service;
-
-  private doorStates = {
-    Current: -1,
-    Target: -1,
-  };
 
   constructor(
         private readonly platform: GarageDoorOpenerPlatform,
         private readonly accessory: PlatformAccessory,
-        private readonly config: PlatformConfig,
+        private readonly garageState: GarageState,
   ) {
+    
+    this.platform.log.debug('constructing GarageDoorOpenerAccessory...');
+    
+    // set accessory information
+    this.accessory.getService(this.platform.Service.AccessoryInformation)!
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
+      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
 
-        // set accessory information
-        this.accessory.getService(this.platform.Service.AccessoryInformation)!
-          .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
-          .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-          .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+    // get the LightBulb service if it exists, otherwise create a new LightBulb service
+    // you can create multiple services for each accessory
+    this.service = this.accessory.getService(this.platform.Service.GarageDoorOpener)
+        || this.accessory.addService(this.platform.Service.GarageDoorOpener);
 
-        // get the LightBulb service if it exists, otherwise create a new LightBulb service
-        // you can create multiple services for each accessory
-        this.service = this.accessory.getService(this.platform.Service.GarageDoorOpener)
-            || this.accessory.addService(this.platform.Service.GarageDoorOpener);
+    // set the service name, this is what is displayed as the default name on the Home app
+    // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
+    // this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.exampleDisplayName);
 
-        // set the service name, this is what is displayed as the default name on the Home app
-        // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-        // this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.exampleDisplayName);
+    this.garageState = garageState;
 
-        // register handlers for the TargetDoorState Characteristic
-        this.service.getCharacteristic(this.platform.Characteristic.TargetDoorState)
-          .onSet(this.setTargetDoorState.bind(this))
-          .onGet(this.getTargetDoorState.bind(this));
+    // register handlers for the TargetDoorState Characteristic
+    const tds = this.service.getCharacteristic(this.platform.Characteristic.TargetDoorState);
+    tds
+      .onSet(this.setTargetDoorState.bind(this))
+      .onGet(this.getTargetDoorState.bind(this));
 
-        // register handlers for the CurrentDoorState Characteristic
-        this.service.getCharacteristic(this.platform.Characteristic.CurrentDoorState)
-        //   .onSet(this.setCurrentDoorState.bind(this))
-          .onGet(this.getCurrentDoorState.bind(this));
+    // register handlers for the CurrentDoorState Characteristic
+    const cds = this.service.getCharacteristic(this.platform.Characteristic.CurrentDoorState);
+    cds
+      .onSet(this.setCurrentDoorState.bind(this))
+      .onGet(this.getCurrentDoorState.bind(this));
+
+    this.platform.log.debug('initial door states: ', this.garageState.description());
   }
 
   currentDoorStateCharacteristic(): Characteristic | undefined {
     return this.service.getCharacteristic(this.platform.Characteristic.CurrentDoorState);
   }
 
-  handleStateUpdate(payload: Buffer) {
-    this.platform.log.info('state update: ', payload);
-    const currentStateValue = payload.toString('ascii');
-    this.platform.log.debug('payload value: ', currentStateValue);
-
-    let value: number;
-    switch (currentStateValue) {
-      case 'open':
-        value = this.platform.Characteristic.CurrentDoorState.OPEN;
-        break;
-
-      case 'opening':
-        value = this.platform.Characteristic.CurrentDoorState.OPENING;
-        break;
-
-      case 'closing':
-        value = this.platform.Characteristic.CurrentDoorState.CLOSING;
-        break;
-
-      case 'closed':
-        value = this.platform.Characteristic.CurrentDoorState.CLOSED;
-        break;
-
-      case 'stopped':
-        value = this.platform.Characteristic.CurrentDoorState.STOPPED;
-        break;
-
-      default:
-        return;
-    }
-
-    this.setCurrentDoorState(value);
+  targetDoorStateCharacteristic(): Characteristic | undefined {
+    return this.service.getCharacteristic(this.platform.Characteristic.TargetDoorState);
   }
 
-  async handleLogUpdate(payload: Buffer) {
-    this.platform.log.info('log update: ', payload);
+  handleCurrentDoorStateUpdate(value: number) {
+    if (this.garageState.getCurrentState() === value) {
+      this.platform.log.debug('ignoring same (current) state transition');
+      return;
+    }
+
+    this.platform.log.info('state update to: ', value);
+    const currentDoorState = this.currentDoorStateCharacteristic();
+    if (currentDoorState !== undefined) {
+      this.platform.log.debug('Update value (current) ->', value);
+      this.garageState.updateCurrentState(value);
+      currentDoorState.updateValue(value);
+      
+      const tgValue = this.garageState.targetDoorStateForCurrent(value);
+      this.handleTargetDoorStateUpdate(tgValue);
+    }
+  }
+
+  handleTargetDoorStateUpdate(value: number, publish: boolean = true) {
+    if (value > -1 && this.garageState.getTargetState() !== value) {
+      this.garageState.updateTargetState(value, publish);
+      
+      const targetDoorState = this.targetDoorStateCharacteristic();
+      if (targetDoorState !== undefined) {
+        this.platform.log.debug('Update value (target) ->', value);  
+        targetDoorState.updateValue(value);
+      }
+    }
+  }
+
+  async handleLogUpdate(value: string) {
+    this.platform.log.info('log update: ', value);
   }
 
   async setTargetDoorState(value: CharacteristicValue) {
-    // implement your own code to turn your device on/off
-    this.doorStates.Target = value as number;
-
-    this.platform.log.debug('Set TargetDoorState ->', value);
+    // publish an mqtt message if necessary
+    this.garageState.updateTargetState(value as number);
+    this.platform.log.debug('Set TargetDoorState ->', this.garageState.description());
   }
 
   async getTargetDoorState(): Promise<CharacteristicValue> {
-    const state = this.doorStates.Target;
-
+    const state = this.garageState.getTargetState();
     this.platform.log.debug('Get TargetDoorState ->', state);
     return state;
   }
 
-  setCurrentDoorState(value: CharacteristicValue) {
-    this.doorStates.Current = Number(value);
-    this.platform.log.debug('Set CurrentDoorState ->', this.doorStates.Current);
-
-    const currentDoorState = this.currentDoorStateCharacteristic();
-    if (currentDoorState !== undefined) {
-      currentDoorState.setValue(value);
-    }
+  async setCurrentDoorState(value: CharacteristicValue) {
+    this.garageState.updateCurrentState(value as number);
+    this.platform.log.debug('Set CurrentDoorState ->', this.garageState.description());
   }
 
   async getCurrentDoorState(): Promise<CharacteristicValue> {
-    const state = this.doorStates.Current;
-
+    const state = this.garageState.getCurrentState();
     this.platform.log.debug('Get CurrentDoorState ->', state);
     return state;
   }

@@ -1,8 +1,9 @@
 import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { GarageAccessory, GarageDoorOpenerAccessory } from './platformAccessory.js';
+import { GarageDoorOpenerAccessory } from './platformAccessory.js';
 import { GarageMQTT } from './garageclient.js';
+import { GarageState } from './garagestate.js';
 
 /**
  * HomebridgePlatform
@@ -15,17 +16,23 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
-  private garageAccessory: GarageAccessory | null;
+  private garageAccessory: GarageDoorOpenerAccessory | null;
   private unhandledBuffers: Buffer[] = [];
+  private garageClient: GarageMQTT | null;
+  private garageState: GarageState;
 
   constructor(
-        public readonly log: Logging,
-        public readonly config: PlatformConfig,
-        public readonly api: API,
+    public readonly log: Logging,
+    public readonly config: PlatformConfig,
+    public readonly api: API,
   ) {
     this.Service = api.hap.Service;
     this.Characteristic = api.hap.Characteristic;
     this.garageAccessory = null;
+    this.garageClient = null;
+
+    // start with closed state
+    this.garageState = new GarageState(api.hap.Characteristic.CurrentDoorState.CLOSED, api);
 
     this.log.debug('Finished initializing platform:', this.config.name);
 
@@ -42,20 +49,32 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
-      (async () => await this.discoverDevices(config))();
+      this.discoverDevices();
     });
   }
 
-  getSetTopic(): string {
-    return (this.config['setTopic'] as string) ?? 'garage/door/set';
+  async cleanup() {
+    await this.garageClient?.disconnect();
   }
 
-  getStateTopic(): string {
-    return (this.config['stateTopic'] as string) ?? 'garage/door/state';
+  getTargetTopic(): string {
+    return (this.config['targetTopic'] as string) ?? 'garage/door/target';
+  }
+
+  getCurrentTopic(): string {
+    return (this.config['currentTopic'] as string) ?? 'garage/door/current';
   }
 
   geLogTopic(): string {
     return (this.config['stateTopic'] as string) ?? 'garage/door/log';
+  }
+
+  getCurrentDoorStateClosed(): number {
+    return this.Characteristic.CurrentDoorState.CLOSED;
+  }
+
+  getCurrentDoorStateOpen(): number {
+    return this.Characteristic.CurrentDoorState.OPEN;
   }
 
   /**
@@ -69,19 +88,44 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.accessories.push(accessory);
   }
 
-  async configureDevice(config: PlatformConfig) {
-    const mqttUsername = config['mqttUsername'];
-    const mqttPassword = config['mqttPassword'];
-    const clientID = config['mqttClientID'] ?? 'GarageMQTT';
-    const mqttHost = config['mqttHost'] ?? 'mqtt://localhost:1883';
+  async discoverDevices() {
+    const mqttUsername = this.config['mqttUsername'];
+    const mqttPassword = this.config['mqttPassword'];
+    const clientID = this.config['mqttClientID'] ?? 'GarageMQTT';
+    const mqttHost = this.config['mqttHost'] ?? 'mqtt://localhost:1883';
 
+    const client = await this.connectAndSubscribe(clientID, mqttUsername, mqttPassword, mqttHost);
+    // at this point we should be connected and should have established a connection...
+    this.garageClient = client;
+
+    //for closed, target and current point to the same value (1)
+    this.garageState.updateCurrentState(this.getCurrentDoorStateClosed());
+    this.garageState.updateTargetState(this.getCurrentDoorStateClosed());
+
+    const targetTopic = this.config['targetTopic'];
+    if (targetTopic) {
+      this.garageState.on('target', (value) => {
+        this.log.info('publishing target update: ', value);
+        client.publishValue(targetTopic, value);
+      });
+    } else {
+      this.log.error('targetTopic not defined');
+    }
+
+    // let's assume closed as the initial state
+    this.initializeAccessory();
+  }
+
+  async connectAndSubscribe(clientID: string, username: string, password: string, host: string): Promise<GarageMQTT> {
     this.log.debug('starting mqtt client');
-    const client = await GarageMQTT.init(clientID, mqttUsername, mqttPassword, mqttHost);
+    const client = await GarageMQTT.init(clientID, username, password, host);
 
-    const subscription = await client.addSubscription([this.getSetTopic(), this.getStateTopic()]);
+    const subscription = await client.addSubscription([this.getTargetTopic(), this.getCurrentTopic()]);
     this.log.debug('mqtt subscriptions: ', subscription);
 
-    client.handleMessage(this.receiveMessage.bind(this));
+    client.onMessage(this.receiveMessage.bind(this));
+
+    return client;
   }
 
   async receiveMessage(topic: string, payload: Buffer) {
@@ -89,24 +133,41 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.log.info('received payload: ', payload);
 
     if (this.garageAccessory === null) {
-      this.log.debug('Accessory not configured (yet)');
-      this.unhandledBuffers.push(payload);
-      return;
+      this.log.debug('garageAccessory is null, initializing...');
+      this.initializeAccessory();
     }
 
+    this.handleTopic(topic, payload);
+  }
+
+  handleTopic(topic: string, payload: Buffer) {
+    this.log.debug('handle topic: ', topic);
+    const stringValue = payload.toString('ascii');
+    
     switch (topic) {
-      case this.getStateTopic():
-        this.log.debug('accessory is handling state update');
-        this.garageAccessory?.handleStateUpdate(payload);
+      case this.getCurrentTopic():
+        {
+          const value = this.mapCurrentDoorState(stringValue);
+          this.log.debug('accessory is handling current state update: ', stringValue, ', value: ', value);
+          if (value > -1) {
+            this.garageAccessory?.handleCurrentDoorStateUpdate(value);
+          } else {
+            this.log.error('unknown door state value ', value, ' for payload: ', stringValue);
+          }
+        }
         break;
 
-      case this.getSetTopic():
+      case this.getTargetTopic():
+      {
+        const value = this.mapTargetDoorState(stringValue);
+        this.log.debug('accessory is handling target state update: ', stringValue, ', value: ', value);
+        if (value > -1) {
+          this.garageAccessory?.handleTargetDoorStateUpdate(value, false);
+        } else {
+          this.log.error('unknown door state value ', value, ' for payload: ', stringValue);
+        }
         break;
-
-      case this.geLogTopic():
-        this.log.debug('accessory is handling log update');
-        this.garageAccessory?.handleLogUpdate(payload);
-        break;
+      }
 
       default:
         this.log.debug('unhandled topic message: ', topic);
@@ -114,9 +175,13 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  async discoverDevices(config: PlatformConfig) {
-    this.log.debug('discovering devices:');
-    await this.configureDevice(config);
+  initializeAccessory() {
+    if (this.garageAccessory !== null) {
+      this.log.error('Accessory already initialized');
+      return;
+    }
+
+    this.log.debug('initializing Garage Door Opener Accessory...');
 
     const deviceID = 'GD01';
     const deviceDisplayName = 'Garage Door Opener';
@@ -140,7 +205,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
 
       // create the accessory handler for the restored accessory
       // this is imported from `platformAccessory.ts`
-      this.garageAccessory = new GarageDoorOpenerAccessory(this, existingAccessory, this.config);
+      this.garageAccessory = new GarageDoorOpenerAccessory(this, existingAccessory, this.garageState);
 
       // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
       // remove platform accessories when no longer present
@@ -159,10 +224,45 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
 
       // create the accessory handler for the newly create accessory
       // this is imported from `platformAccessory.ts`
-      this.garageAccessory = new GarageDoorOpenerAccessory(this, accessory, this.config);
+      this.garageAccessory = new GarageDoorOpenerAccessory(this, accessory, this.garageState);
 
       // link the accessory to your platform
       this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+    }
+  }
+
+  mapCurrentDoorState(value: string): number {
+    switch (value) {
+      case '0':
+        return this.Characteristic.CurrentDoorState.OPEN;
+
+      case '1':
+        return this.Characteristic.CurrentDoorState.CLOSED;
+
+      case '2':
+        return this.Characteristic.CurrentDoorState.OPENING;
+
+      case '3':
+        return this.Characteristic.CurrentDoorState.CLOSING;
+
+      case '4':
+        return this.Characteristic.CurrentDoorState.STOPPED;
+
+      default:
+        return -1;
+    }
+  }
+
+  mapTargetDoorState(value: string): number {
+    switch (value) {
+      case '0':
+        return this.Characteristic.TargetDoorState.OPEN;
+
+      case '1':
+        return this.Characteristic.TargetDoorState.CLOSED;
+
+      default:
+        return -1;
     }
   }
 }

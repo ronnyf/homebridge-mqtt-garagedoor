@@ -35,29 +35,29 @@
         "required": false,
         "description": "MQTT Client ID (optional, default: HomeBridge)"
       },
-      "setTopic": {
+      "targetTopic": {
         "type": "string",
-        "title": "SET topic",
-        "placeholder": "garage/door/set",
-        "description": "MQTT Topic to trigger the garage door motor"
+        "title": "TARGET door state topic",
+        "placeholder": "garage/door/target",
+        "description": "MQTT Topic to indicate the desired target door state."
       },
-      "stateTopic": {
+      "currentTopic": {
         "type": "string",
-        "title": "STATE topic",
-        "placeholder": "garage/door/state",
-        "description": "MQTT Topic for door state subscription"
+        "title": "CURRENT door state topic",
+        "placeholder": "garage/door/current",
+        "description": "MQTT Topic for the current door state"
       },
       "mqttOpenMessage": {
         "type": "string",
         "title": "OPEN message",
-        "placeholder": "open",
-        "description": "MQTT message payload for the `open` command"
+        "placeholder": "0",
+        "description": "MQTT message payload for the target door state 'open'"
       },
       "mqttCloseMessage": {
         "type": "string",
         "title": "CLOSE message",
-        "placeholder": "close",
-        "description": "MQTT message payload for the `close` command"
+        "placeholder": "1",
+        "description": "MQTT message payload for the target door state 'close'"
       }
     }
   }

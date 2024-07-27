@@ -2,8 +2,6 @@ import mqtt, { IClientOptions, IClientSubscribeOptions, ISubscriptionGrant, Mqtt
 
 export class GarageMQTT {
 
-  private; 
-
   private client: MqttClient;
   private constructor(client: MqttClient) {
     this.client = client;
@@ -37,14 +35,23 @@ export class GarageMQTT {
     return this.client.subscribeAsync(topic, opts);
   }
 
-  async readMessage(topic: string): Buffer {
-    this.client.on('message', (topic, payload) => {
-      
-    });
+  onMessage(callback: OnMessageCallback) {
+    this.client.on('message', callback);
   }
 
-  async handleMessage(callback: OnMessageCallback) {
-    this.client.on('message', callback);
+  publish(topic: string, message: string) {
+    this.client.publish(topic, message);
+  }
+
+  publishValue(topic: string, value: number) {
+    const stringValue = String(value);
+    if (stringValue !== undefined) {
+      this.publish(topic, stringValue);
+    }
+  }
+
+  async disconnect() { 
+    return this.client.endAsync;
   }
 
 }
