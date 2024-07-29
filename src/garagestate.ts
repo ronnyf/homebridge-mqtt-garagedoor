@@ -15,12 +15,18 @@ export class GarageState extends EventEmitter {
     this.target = this.targetDoorStateForCurrent(current);
   }
 
-  public updateCurrentState(current: number) { 
+  public updateCurrentState(current: number) {
+    if (this.current === current) {
+      return; 
+    }
     this.current = current;
     this.emit('current', current);
   }
 
   public updateTargetState(target: number, emit: boolean = true) {
+    if (this.target === target) {
+      return;
+    }
     this.target = target;
     if (emit === true) {
       this.emit('target', target);

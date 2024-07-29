@@ -17,7 +17,6 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
   private garageAccessory: GarageDoorOpenerAccessory | null;
-  private unhandledBuffers: Buffer[] = [];
   private garageClient: GarageMQTT | null;
   private garageState: GarageState;
 
@@ -99,18 +98,19 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.garageClient = client;
 
     //for closed, target and current point to the same value (1)
+
     this.garageState.updateCurrentState(this.getCurrentDoorStateClosed());
     this.garageState.updateTargetState(this.getCurrentDoorStateClosed());
 
-    const targetTopic = this.config['targetTopic'];
-    if (targetTopic) {
-      this.garageState.on('target', (value) => {
-        this.log.info('publishing target update: ', value);
-        client.publishValue(targetTopic, value);
-      });
-    } else {
-      this.log.error('targetTopic not defined');
-    }
+    // const targetTopic = this.config['targetTopic'];
+    // if (targetTopic) {
+    //   this.garageState.on('target', (value) => {
+    //     this.log.info('publishing target update: ', value);
+    //     client.publishValue(targetTopic, value);
+    //   });
+    // } else {
+    //   this.log.error('targetTopic not defined');
+    // }
 
     // let's assume closed as the initial state
     this.initializeAccessory();
@@ -129,9 +129,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
   }
 
   async receiveMessage(topic: string, payload: Buffer) {
-    this.log.info('received topic: ', topic);
-    this.log.info('received payload: ', payload);
-
+    this.log.debug('received topic: ', topic, 'payload: ', payload);
     if (this.garageAccessory === null) {
       this.log.debug('garageAccessory is null, initializing...');
       this.initializeAccessory();
@@ -141,16 +139,15 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
   }
 
   handleTopic(topic: string, payload: Buffer) {
-    this.log.debug('handle topic: ', topic);
     const stringValue = payload.toString('ascii');
     
     switch (topic) {
       case this.getCurrentTopic():
         {
           const value = this.mapCurrentDoorState(stringValue);
-          this.log.debug('accessory is handling current state update: ', stringValue, ', value: ', value);
           if (value > -1) {
-            this.garageAccessory?.handleCurrentDoorStateUpdate(value);
+            this.garageState.updateCurrentState(value);
+            this.log.debug('did update current state: :', value);
           } else {
             this.log.error('unknown door state value ', value, ' for payload: ', stringValue);
           }
@@ -160,9 +157,9 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
       case this.getTargetTopic():
       {
         const value = this.mapTargetDoorState(stringValue);
-        this.log.debug('accessory is handling target state update: ', stringValue, ', value: ', value);
         if (value > -1) {
-          this.garageAccessory?.handleTargetDoorStateUpdate(value, false);
+          this.garageState.updateTargetState(value);
+          this.log.debug('did update target state: :', value);
         } else {
           this.log.error('unknown door state value ', value, ' for payload: ', stringValue);
         }
