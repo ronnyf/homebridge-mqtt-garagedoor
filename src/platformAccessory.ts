@@ -28,8 +28,6 @@ export class GarageDoorOpenerAccessory {
     // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
     // this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.exampleDisplayName);
 
-    this.garageState = garageState;
-
     // register handlers for the TargetDoorState Characteristic
     const tds = this.service.getCharacteristic(this.platform.Characteristic.TargetDoorState);
     tds
@@ -42,7 +40,23 @@ export class GarageDoorOpenerAccessory {
       .onSet(this.setCurrentDoorState.bind(this))
       .onGet(this.getCurrentDoorState.bind(this));
 
+
+    garageState.on('current', (currentValue) => {
+      if (this.currentDoorStateCharacteristic()?.value === currentValue) {
+        return;
+      }
+      this.currentDoorStateCharacteristic()?.updateValue(currentValue);
+    });
+
+    garageState.on('target', (targetValue) => {
+      if (this.targetDoorStateCharacteristic()?.value === targetValue) {
+        return;
+      }
+      this.targetDoorStateCharacteristic()?.updateValue(targetValue);
+    });
+
     this.platform.log.debug('initial door states: ', this.garageState.description());
+    this.garageState = garageState;
   }
 
   currentDoorStateCharacteristic(): Characteristic | undefined {
@@ -51,36 +65,6 @@ export class GarageDoorOpenerAccessory {
 
   targetDoorStateCharacteristic(): Characteristic | undefined {
     return this.service.getCharacteristic(this.platform.Characteristic.TargetDoorState);
-  }
-
-  handleCurrentDoorStateUpdate(value: number) {
-    if (this.garageState.getCurrentState() === value) {
-      this.platform.log.debug('ignoring same (current) state transition');
-      return;
-    }
-
-    this.platform.log.info('state update to: ', value);
-    const currentDoorState = this.currentDoorStateCharacteristic();
-    if (currentDoorState !== undefined) {
-      this.platform.log.debug('Update value (current) ->', value);
-      this.garageState.updateCurrentState(value);
-      currentDoorState.updateValue(value);
-      
-      const tgValue = this.garageState.targetDoorStateForCurrent(value);
-      this.handleTargetDoorStateUpdate(tgValue);
-    }
-  }
-
-  handleTargetDoorStateUpdate(value: number, publish: boolean = true) {
-    if (value > -1 && this.garageState.getTargetState() !== value) {
-      this.garageState.updateTargetState(value, publish);
-      
-      const targetDoorState = this.targetDoorStateCharacteristic();
-      if (targetDoorState !== undefined) {
-        this.platform.log.debug('Update value (target) ->', value);  
-        targetDoorState.updateValue(value);
-      }
-    }
   }
 
   async handleLogUpdate(value: string) {
