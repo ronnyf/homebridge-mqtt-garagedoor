@@ -30,7 +30,7 @@ export class GarageMQTT {
   }
 
   async addSubscription(topic: string | string[]): Promise<ISubscriptionGrant[]> { 
-    const opts: IClientSubscribeOptions = { qos: 1 }; // at most once 
+    const opts: IClientSubscribeOptions = { qos: 0 }; // at most once (1 would be ok would be multiple times)
     // qos: 1 means we want the message to arrive at least once but don't care if it arrives twice (or more
     return this.client.subscribeAsync(topic, opts);
   }
