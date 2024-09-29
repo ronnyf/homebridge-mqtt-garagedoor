@@ -98,19 +98,8 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.garageClient = client;
 
     //for closed, target and current point to the same value (1)
-
     this.garageState.updateCurrentState(this.getCurrentDoorStateClosed());
     this.garageState.updateTargetState(this.getCurrentDoorStateClosed());
-
-    // const targetTopic = this.config['targetTopic'];
-    // if (targetTopic) {
-    //   this.garageState.on('target', (value) => {
-    //     this.log.info('publishing target update: ', value);
-    //     client.publishValue(targetTopic, value);
-    //   });
-    // } else {
-    //   this.log.error('targetTopic not defined');
-    // }
 
     // let's assume closed as the initial state
     this.initializeAccessory();
@@ -146,8 +135,9 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
         {
           const value = this.mapCurrentDoorState(stringValue);
           if (value > -1) {
+            const old = this.garageAccessory?.getCurrentDoorState();
             this.garageState.updateCurrentState(value);
-            this.log.debug('did update current state: :', value);
+            this.log.debug('did update from current state: ', old, ' to:', value);
           } else {
             this.log.error('unknown door state value ', value, ' for payload: ', stringValue);
           }
