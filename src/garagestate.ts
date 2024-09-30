@@ -7,20 +7,22 @@ export class GarageState extends EventEmitter {
   private readonly Characteristic: typeof Characteristic;
   private readonly emitter: EventEmitter;
 
-  constructor(current: number, api: API) {
+  constructor(api: API) {
     super();
     this.Characteristic = api.hap.Characteristic;
     this.emitter = new EventEmitter();
-    this.current = current;
-    this.target = this.targetDoorStateForCurrent(current);
+    this.current = -1;
+    this.target = -1;
   }
 
-  public updateCurrentState(current: number) {
+  public updateCurrentState(current: number, emit: boolean = true) {
     if (this.current === current) {
       return; 
     }
     this.current = current;
-    this.emit('current', current);
+    if (emit === true) {
+      this.emit('current', current);
+    }
   }
 
   public updateTargetState(target: number, emit: boolean = true) {
@@ -39,6 +41,27 @@ export class GarageState extends EventEmitter {
 
   public getTargetState(): number { 
     return this.target;
+  }
+
+  public getCurrentDescription(): string {
+    switch (this.current) {
+      case this.Characteristic.CurrentDoorState.OPEN:
+        return 'Open';
+
+      case this.Characteristic.CurrentDoorState.CLOSED:
+        return 'Closed';
+
+      case this.Characteristic.CurrentDoorState.OPENING:
+        return 'Opening';
+
+      case this.Characteristic.CurrentDoorState.CLOSING:
+        return 'Closing';
+      
+      case this.Characteristic.CurrentDoorState.STOPPED:
+        return 'Stopped';
+    }
+
+    return 'unknown';
   }
 
   public targetDoorStateForCurrent(value: number): number {
@@ -61,6 +84,6 @@ export class GarageState extends EventEmitter {
   }
 
   public description(): string {
-    return 'current: ' + this.current + ', target: ' + this.target;
+    return 'current: ' + this.getCurrentDescription() + ', target: ' + this.target;
   }
 }

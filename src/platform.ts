@@ -31,7 +31,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.garageClient = null;
 
     // start with closed state
-    this.garageState = new GarageState(api.hap.Characteristic.CurrentDoorState.CLOSED, api);
+    this.garageState = new GarageState(api);
 
     this.log.debug('Finished initializing platform:', this.config.name);
 
@@ -88,6 +88,8 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
   }
 
   async discoverDevices() {
+    this.log.debug('discovering devices...');
+    
     const mqttUsername = this.config['mqttUsername'];
     const mqttPassword = this.config['mqttPassword'];
     const clientID = this.config['mqttClientID'] ?? 'GarageMQTT';
@@ -96,13 +98,6 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     const client = await this.connectAndSubscribe(clientID, mqttUsername, mqttPassword, mqttHost);
     // at this point we should be connected and should have established a connection...
     this.garageClient = client;
-
-    //for closed, target and current point to the same value (1)
-    this.garageState.updateCurrentState(this.getCurrentDoorStateClosed());
-    this.garageState.updateTargetState(this.getCurrentDoorStateClosed());
-
-    // let's assume closed as the initial state
-    this.initializeAccessory();
   }
 
   async connectAndSubscribe(clientID: string, username: string, password: string, host: string): Promise<GarageMQTT> {
@@ -118,26 +113,25 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
   }
 
   async receiveMessage(topic: string, payload: Buffer) {
-    this.log.debug('received topic: ', topic, 'payload: ', payload);
-    if (this.garageAccessory === null) {
-      this.log.debug('garageAccessory is null, initializing...');
-      this.initializeAccessory();
-    }
-
-    this.handleTopic(topic, payload);
-  }
-
-  handleTopic(topic: string, payload: Buffer) {
     const stringValue = payload.toString('ascii');
-    
+    this.log.debug('received topic: ', topic, 'payload: ', stringValue);
     switch (topic) {
       case this.getCurrentTopic():
         {
           const value = this.mapCurrentDoorState(stringValue);
           if (value > -1) {
-            const old = this.garageAccessory?.getCurrentDoorState();
             this.garageState.updateCurrentState(value);
-            this.log.debug('did update from current state: ', old, ' to:', value);
+            this.log.debug('did update to current state: ', value);
+
+            if (this.garageState.getTargetState() < 0) {
+              this.log.debug('quietly updating target state');
+              const mappedTargetState = this.garageState.targetDoorStateForCurrent(value);
+              this.garageState.updateTargetState(mappedTargetState, false);
+              if (this.garageAccessory === null) {
+                this.initializeAccessory();
+              }
+            }
+
           } else {
             this.log.error('unknown door state value ', value, ' for payload: ', stringValue);
           }
@@ -164,14 +158,14 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
 
   initializeAccessory() {
     if (this.garageAccessory !== null) {
-      this.log.error('Accessory already initialized');
+      this.log.debug('Accessory already initialized');
       return;
     }
 
     this.log.debug('initializing Garage Door Opener Accessory...');
 
-    const deviceID = 'GD01';
-    const deviceDisplayName = 'Garage Door Opener';
+    const deviceID = 'GDC01';
+    const deviceDisplayName = 'Garage Door';
 
     // generate a unique id for the accessory this should be generated from
     // something globally unique, but constant, for example, the device serial
@@ -251,5 +245,10 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
       default:
         return -1;
     }
+  }
+
+  publishTargetDoorState(value: number) {
+    this.log.debug('publishing target door state: ', value, ' to topic: ', this.getTargetTopic());
+    this.garageClient?.publishValue(this.getTargetTopic(), value);
   }
 }
