@@ -15,9 +15,9 @@ export class GarageDoorOpenerAccessory {
     
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'RFx Software Inc.')
+      .setCharacteristic(this.platform.Characteristic.Model, 'GDC-1')
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, '100001');
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
     // you can create multiple services for each accessory
@@ -42,28 +42,32 @@ export class GarageDoorOpenerAccessory {
 
 
     garageState.on('current', (currentValue) => {
-      if (this.currentDoorStateCharacteristic()?.value === currentValue) {
-        return;
+      this.platform.log.debug('emitted [current] value: ', currentValue);
+      if (currentValue >= 0 && currentValue < 5) {
+        this.currentDoorStateCharacteristic().updateValue(currentValue);
+      } else {
+        this.platform.log.warn('ignoring current value update: ', currentValue);
       }
-      this.currentDoorStateCharacteristic()?.updateValue(currentValue);
     });
 
     garageState.on('target', (targetValue) => {
-      if (this.targetDoorStateCharacteristic()?.value === targetValue) {
-        return;
+      this.platform.log.debug('emitted [target] value: ', targetValue);
+      if (targetValue >= 0 && targetValue < 2) {
+        this.targetDoorStateCharacteristic()?.updateValue(targetValue);
+      }else {
+        this.platform.log.warn('ignoring target value update: ', targetValue);
       }
-      this.targetDoorStateCharacteristic()?.updateValue(targetValue);
     });
 
     this.platform.log.debug('initial door states: ', this.garageState.description());
     this.garageState = garageState;
   }
 
-  currentDoorStateCharacteristic(): Characteristic | undefined {
+  currentDoorStateCharacteristic(): Characteristic {
     return this.service.getCharacteristic(this.platform.Characteristic.CurrentDoorState);
   }
 
-  targetDoorStateCharacteristic(): Characteristic | undefined {
+  targetDoorStateCharacteristic(): Characteristic {
     return this.service.getCharacteristic(this.platform.Characteristic.TargetDoorState);
   }
 
@@ -72,9 +76,13 @@ export class GarageDoorOpenerAccessory {
   }
 
   async setTargetDoorState(value: CharacteristicValue) {
-    // publish an mqtt message if necessary
+    if (this.garageState.getTargetState() === value) {
+      return;
+    }
+
     this.garageState.updateTargetState(value as number);
     this.platform.log.debug('Set TargetDoorState ->', this.garageState.description());
+    this.platform.publishTargetDoorState(value as number);
   }
 
   async getTargetDoorState(): Promise<CharacteristicValue> {
