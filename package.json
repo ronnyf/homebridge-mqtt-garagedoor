@@ -20,7 +20,7 @@
   "scripts": {
     "lint": "eslint src/**.ts --max-warnings=0",
     "watch": "npm run build && npm link && nodemon",
-    "prebuild": "node -p \"'export const PLUGIN_VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
+    "prebuild": "echo \"export const PLUGIN_VERSION = '`jq -r '.version' < package.json`';\" > ./src/version.ts",
     "build": "rimraf ./dist && tsc",
     "prepublishOnly": "npm run lint && npm run build"
   },
