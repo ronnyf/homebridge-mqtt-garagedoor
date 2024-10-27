@@ -37,6 +37,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     // Homebridge 1.8.0 introduced a `log.success` method that can be used to log success messages
     // For users that are on a version prior to 1.8.0, we need a 'polyfill' for this method
     if (!log.success) {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       log.success = log.info;
     }
 
@@ -46,7 +47,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     // to start discovery of new accessories.
     this.api.on('didFinishLaunching', () => {
       // run the method to discover / register your devices as accessories
-      this.initialize();
+      void this.initialize();
     });
   }
 
@@ -55,7 +56,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     await this.connectMQTTClient();
     this.log.debug('connected to client: ', this.garageClient.getClient());
     this.initializeAccessory();
-    this.mqttSubscription();
+    void this.mqttSubscription();
   }
 
   async cleanup() {
@@ -95,10 +96,10 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
   async connectMQTTClient(): Promise<void> {
     this.log.debug('discovering GarageMQTT client...');
     
-    const mqttUsername = this.config['mqttUsername'];
-    const mqttPassword = this.config['mqttPassword'];
-    const clientID = this.config['mqttClientID'] ?? 'GarageMQTT';
-    const mqttHost = this.config['mqttHost'] ?? 'mqtt://localhost:1883';
+    const mqttUsername = this.config['mqttUsername'] as string;
+    const mqttPassword = this.config['mqttPassword'] as string;
+    const clientID = this.config['mqttClientID'] as string | null ?? 'GarageMQTT';
+    const mqttHost = this.config['mqttHost'] as string | null ?? 'mqtt://localhost:1883';
 
     await this.garageClient?.connectAsync(clientID, mqttUsername, mqttPassword, mqttHost);
     // at this point we should be connected and should have established a connection...
@@ -110,7 +111,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.garageClient.onMessage(this.receiveMessage.bind(this));
   }
 
-  async receiveMessage(topic: string, payload: Buffer) {
+  receiveMessage(topic: string, payload: Buffer) {
     const stringValue = payload.toString('ascii');
     this.log.debug('received topic: ', topic, 'payload: ', stringValue);
     switch (topic) {

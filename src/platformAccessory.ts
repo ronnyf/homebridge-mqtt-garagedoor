@@ -44,6 +44,7 @@ export class GarageDoorOpenerAccessory {
     garageState.on('current', (currentValue) => {
       this.platform.log.debug('emitted [current] value: ', currentValue);
       if (currentValue >= 0 && currentValue < 5) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         this.currentDoorStateCharacteristic().updateValue(currentValue);
       } else {
         this.platform.log.warn('ignoring current value update: ', currentValue);
@@ -53,6 +54,7 @@ export class GarageDoorOpenerAccessory {
     garageState.on('target', (targetValue) => {
       this.platform.log.debug('emitted [target] value: ', targetValue);
       if (targetValue >= 0 && targetValue < 2) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         this.targetDoorStateCharacteristic()?.updateValue(targetValue);
       }else {
         this.platform.log.warn('ignoring target value update: ', targetValue);
@@ -71,11 +73,11 @@ export class GarageDoorOpenerAccessory {
     return this.service.getCharacteristic(this.platform.Characteristic.TargetDoorState);
   }
 
-  async handleLogUpdate(value: string) {
+  handleLogUpdate(value: string) {
     this.platform.log.info('log update: ', value);
   }
 
-  async setTargetDoorState(value: CharacteristicValue) {
+  setTargetDoorState(value: CharacteristicValue) {
     if (this.garageState.getTargetState() === value) {
       return;
     }
@@ -85,18 +87,18 @@ export class GarageDoorOpenerAccessory {
     this.platform.publishTargetDoorState(value as number);
   }
 
-  async getTargetDoorState(): Promise<CharacteristicValue> {
+  getTargetDoorState(): CharacteristicValue {
     const state = this.garageState.getTargetState();
     this.platform.log.debug('Get TargetDoorState ->', state);
     return state;
   }
 
-  async setCurrentDoorState(value: CharacteristicValue) {
+  setCurrentDoorState(value: CharacteristicValue) {
     this.garageState.updateCurrentState(value as number);
     this.platform.log.debug('Set CurrentDoorState ->', this.garageState.description());
   }
 
-  async getCurrentDoorState(): Promise<CharacteristicValue> {
+  getCurrentDoorState(): CharacteristicValue {
     const state = this.garageState.getCurrentState();
     this.platform.log.debug('Get CurrentDoorState ->', state);
     return state;

@@ -1,14 +1,22 @@
 {
   "parser": "@typescript-eslint/parser",
   "extends": [
-    "eslint:recommended",
-    "plugin:@typescript-eslint/eslint-recommended",
-    "plugin:@typescript-eslint/recommended" // uses the recommended rules from the @typescript-eslint/eslint-plugin
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking",
+    "plugin:@typescript-eslint/eslint-recommended"
   ],
   "parserOptions": {
-    "ecmaVersion": 2018,
-    "sourceType": "module"
+    "ecmaVersion": 2021,
+    "sourceType": "module",
+    "project": "./tsconfig.json",
+    "tsconfigRootDir": "./",
+    "ecmaFeatures": {
+      "jsx": true
+    }
   },
+  "plugins": [
+    "@typescript-eslint"
+  ],
   "ignorePatterns": [
     "dist"
   ],
@@ -33,5 +41,10 @@
     "@typescript-eslint/explicit-module-boundary-types": "off",
     "@typescript-eslint/semi": ["warn"],
     "@typescript-eslint/member-delimiter-style": "warn"
+  },
+  "settings": {
+    "import/resolver": {
+      "typescript": {}
+    }
   }
 }
