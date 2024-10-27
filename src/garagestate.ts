@@ -1,4 +1,4 @@
-import { API, Characteristic } from 'homebridge';
+import { API, Characteristic, Logger } from 'homebridge';
 import { EventEmitter } from 'events';
 
 export class GarageState extends EventEmitter {
@@ -6,13 +6,15 @@ export class GarageState extends EventEmitter {
   private target: number;
   private readonly Characteristic: typeof Characteristic;
   private readonly emitter: EventEmitter;
+  private readonly log: Logger;
 
-  constructor(api: API) {
+  constructor(api: API, log: Logger) {
     super();
     this.Characteristic = api.hap.Characteristic;
     this.emitter = new EventEmitter();
     this.current = -1;
     this.target = -1;
+    this.log = log;
   }
 
   public updateCurrentState(current: number, emit: boolean = true) {

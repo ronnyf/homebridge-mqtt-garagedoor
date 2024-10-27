@@ -17,7 +17,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
   private garageAccessory: GarageDoorOpenerAccessory | null;
-  private garageClient: GarageMQTT | null;
+  private garageClient: GarageMQTT;
   private garageState: GarageState;
 
   constructor(
@@ -28,10 +28,9 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.Service = api.hap.Service;
     this.Characteristic = api.hap.Characteristic;
     this.garageAccessory = null;
-    this.garageClient = null;
-
+    this.garageClient = new GarageMQTT(null, log);
     // start with closed state
-    this.garageState = new GarageState(api);
+    this.garageState = new GarageState(api, log);
 
     this.log.debug('Finished initializing platform:', this.config.name);
 
@@ -46,10 +45,17 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     // in order to ensure they weren't added to homebridge already. This event can also be used
     // to start discovery of new accessories.
     this.api.on('didFinishLaunching', () => {
-      log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
-      this.discoverDevices();
+      this.initialize();
     });
+  }
+
+  async initialize() {
+    this.log.debug('initializing...');
+    await this.connectMQTTClient();
+    this.log.debug('connected to client: ', this.garageClient.getClient());
+    this.initializeAccessory();
+    this.mqttSubscription();
   }
 
   async cleanup() {
@@ -82,34 +88,26 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
      */
   configureAccessory(accessory: PlatformAccessory) {
     this.log.debug('Loading accessory from cache:', accessory.displayName);
-
     // add the restored accessory to the accessories cache, so we can track if it has already been registered
     this.accessories.push(accessory);
   }
 
-  async discoverDevices() {
-    this.log.debug('discovering devices...');
+  async connectMQTTClient(): Promise<void> {
+    this.log.debug('discovering GarageMQTT client...');
     
     const mqttUsername = this.config['mqttUsername'];
     const mqttPassword = this.config['mqttPassword'];
     const clientID = this.config['mqttClientID'] ?? 'GarageMQTT';
     const mqttHost = this.config['mqttHost'] ?? 'mqtt://localhost:1883';
 
-    const client = await this.connectAndSubscribe(clientID, mqttUsername, mqttPassword, mqttHost);
+    await this.garageClient?.connectAsync(clientID, mqttUsername, mqttPassword, mqttHost);
     // at this point we should be connected and should have established a connection...
-    this.garageClient = client;
   }
 
-  async connectAndSubscribe(clientID: string, username: string, password: string, host: string): Promise<GarageMQTT> {
-    this.log.debug('starting mqtt client');
-    const client = await GarageMQTT.init(clientID, username, password, host);
-
-    const subscription = await client.addSubscription([this.getTargetTopic(), this.getCurrentTopic()]);
+  async mqttSubscription(): Promise<void> {
+    const subscription = await this.garageClient.addSubscription([this.getTargetTopic(), this.getCurrentTopic()]);
     this.log.debug('mqtt subscriptions: ', subscription);
-
-    client.onMessage(this.receiveMessage.bind(this));
-
-    return client;
+    this.garageClient.onMessage(this.receiveMessage.bind(this));
   }
 
   async receiveMessage(topic: string, payload: Buffer) {
@@ -128,7 +126,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
               const mappedTargetState = this.garageState.targetDoorStateForCurrent(value);
               this.garageState.updateTargetState(mappedTargetState, false);
               if (this.garageAccessory === null) {
-                this.initializeAccessory();
+                this.log.error('accessory should not be null at this point');
               }
             }
 
