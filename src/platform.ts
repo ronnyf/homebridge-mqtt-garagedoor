@@ -3,7 +3,6 @@ import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig,
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { GarageDoorOpenerAccessory } from './platformAccessory.js';
 import { GarageMQTT } from './garageclient.js';
-import { GarageState } from './garagestate.js';
 
 /**
  * HomebridgePlatform
@@ -18,7 +17,6 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
   public readonly accessories: PlatformAccessory[] = [];
   private garageAccessory: GarageDoorOpenerAccessory | null;
   private garageClient: GarageMQTT;
-  private garageState: GarageState;
 
   constructor(
     public readonly log: Logging,
@@ -29,9 +27,6 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     this.Characteristic = api.hap.Characteristic;
     this.garageAccessory = null;
     this.garageClient = new GarageMQTT(null, log);
-    // start with closed state
-    this.garageState = new GarageState(api, log);
-
     this.log.debug('Finished initializing platform:', this.config.name);
 
     // Homebridge 1.8.0 introduced a `log.success` method that can be used to log success messages
@@ -98,7 +93,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
     
     const mqttUsername = this.config['mqttUsername'] as string;
     const mqttPassword = this.config['mqttPassword'] as string;
-    const clientID = this.config['mqttClientID'] as string | null ?? 'GarageMQTT';
+    const clientID = this.config['mqttClientID'] as string | null ?? 'GarageDoorMQTT';
     const mqttHost = this.config['mqttHost'] as string | null ?? 'mqtt://localhost:1883';
 
     await this.garageClient?.connectAsync(clientID, mqttUsername, mqttPassword, mqttHost);
@@ -118,18 +113,9 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
       case this.getCurrentTopic():
         {
           const value = this.mapCurrentDoorState(stringValue);
-          if (value > -1) {
-            this.garageState.updateCurrentState(value);
-            this.log.debug('did update to current state: ', value);
-
-            if (this.garageState.getTargetState() < 0) {
-              this.log.debug('quietly updating target state');
-              const mappedTargetState = this.garageState.targetDoorStateForCurrent(value);
-              this.garageState.updateTargetState(mappedTargetState, false);
-              if (this.garageAccessory === null) {
-                this.log.error('accessory should not be null at this point');
-              }
-            }
+          if (value >= 0) {
+            this.garageAccessory?.setCurrentDoorState(value);
+            this.log.debug('did update current state to: ', value);
 
           } else {
             this.log.error('unknown door state value ', value, ' for payload: ', stringValue);
@@ -141,8 +127,8 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
       {
         const value = this.mapTargetDoorState(stringValue);
         if (value > -1) {
-          this.garageState.updateTargetState(value);
-          this.log.debug('did update target state: :', value);
+          this.garageAccessory?.updateTargetDoorStateWithoutPublishing(value);
+          this.log.debug('did update target state to:', value);
         } else {
           this.log.error('unknown door state value ', value, ' for payload: ', stringValue);
         }
@@ -185,7 +171,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
 
       // create the accessory handler for the restored accessory
       // this is imported from `platformAccessory.ts`
-      this.garageAccessory = new GarageDoorOpenerAccessory(this, existingAccessory, this.garageState);
+      this.garageAccessory = new GarageDoorOpenerAccessory(this, existingAccessory);
 
       // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
       // remove platform accessories when no longer present
@@ -204,7 +190,7 @@ export class GarageDoorOpenerPlatform implements DynamicPlatformPlugin {
 
       // create the accessory handler for the newly create accessory
       // this is imported from `platformAccessory.ts`
-      this.garageAccessory = new GarageDoorOpenerAccessory(this, accessory, this.garageState);
+      this.garageAccessory = new GarageDoorOpenerAccessory(this, accessory);
 
       // link the accessory to your platform
       this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);

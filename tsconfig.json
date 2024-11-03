@@ -1,10 +1,9 @@
 {
   "compilerOptions": {
-    "target": "ES2022", // ~node10
+    "lib": ["ES2023"],
     "module": "node16",
-    "lib": [
-      "ES2022"
-    ],
+    "moduleResolution": "node16",
+    "target": "ES2022",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -15,7 +14,6 @@
     "noImplicitAny": false,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node16"
   },
   "include": [
     "src/"

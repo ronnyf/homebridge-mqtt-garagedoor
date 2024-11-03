@@ -4,15 +4,18 @@ import { GarageState } from './garagestate.js';
 
 export class GarageDoorOpenerAccessory {
   private service: Service;
+  private garageState: GarageState;
 
   constructor(
         private readonly platform: GarageDoorOpenerPlatform,
         private readonly accessory: PlatformAccessory,
-        private readonly garageState: GarageState,
+        private readonly state: GarageState | null = null,
   ) {
     
     this.platform.log.debug('constructing GarageDoorOpenerAccessory...');
     
+    this.garageState = state ?? new GarageState(this.platform.api, this.platform.log);
+
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'RFx Software Inc.')
@@ -41,7 +44,7 @@ export class GarageDoorOpenerAccessory {
       .onGet(this.getCurrentDoorState.bind(this));
 
 
-    garageState.on('current', (currentValue) => {
+    this.garageState.on('current', (currentValue) => {
       this.platform.log.debug('emitted [current] value: ', currentValue);
       if (currentValue >= 0 && currentValue < 5) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
@@ -51,7 +54,7 @@ export class GarageDoorOpenerAccessory {
       }
     });
 
-    garageState.on('target', (targetValue) => {
+    this.garageState.on('target', (targetValue) => {
       this.platform.log.debug('emitted [target] value: ', targetValue);
       if (targetValue >= 0 && targetValue < 2) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
@@ -62,7 +65,6 @@ export class GarageDoorOpenerAccessory {
     });
 
     this.platform.log.debug('initial door states: ', this.garageState.description());
-    this.garageState = garageState;
   }
 
   currentDoorStateCharacteristic(): Characteristic {
@@ -77,11 +79,14 @@ export class GarageDoorOpenerAccessory {
     this.platform.log.info('log update: ', value);
   }
 
-  setTargetDoorState(value: CharacteristicValue) {
-    if (this.garageState.getTargetState() === value) {
-      return;
-    }
+  // does not publish the new door state
+  updateTargetDoorStateWithoutPublishing(value: CharacteristicValue) {
+    this.garageState.updateTargetState(value as number);
+    this.platform.log.debug('Update TargetDoorState ->', this.garageState.description());
+  }
 
+  // does publish the new door state
+  setTargetDoorState(value: CharacteristicValue) {
     this.garageState.updateTargetState(value as number);
     this.platform.log.debug('Set TargetDoorState ->', this.garageState.description());
     this.platform.publishTargetDoorState(value as number);
